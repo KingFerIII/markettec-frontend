@@ -3,7 +3,7 @@ import axios from "axios";
 // Ajustamos la URL base para que incluya "/api"
 // Así las peticiones irán a http://127.0.0.1:8000/api/...
 const client = axios.create({
-  baseURL: (import.meta.env.VITE_BACKEND_URL || "http://172.200.235.24:8000/api").replace(/\/$/, ""),
+  baseURL: (import.meta.env.VITE_BACKEND_URL || "http://172.200.235.24/api").replace(/\/$/, ""),
 });
 
 // Interceptor para agregar el Token automáticamente

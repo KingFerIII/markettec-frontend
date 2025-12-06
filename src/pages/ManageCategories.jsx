@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import client from '../api/client';
 
-const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "http://172.200.235.24:8000").replace(/\/$/, "");
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "http://172.200.235.24/api").replace(/\/$/, "");
 
 function ManageCategories() {
   const [categories, setCategories] = useState([]);
