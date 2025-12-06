@@ -25,7 +25,7 @@ function LoginPage() {
       password: password
     })
     .then(response => {
-      receivedToken = "Bearer " + response.data.access; 
+      receivedToken = "Token " + response.data.access; 
       
       // 2. Pedimos el perfil. 
       // NOTA: Pasamos el header manual aquí porque el interceptor lee de localStorage,
