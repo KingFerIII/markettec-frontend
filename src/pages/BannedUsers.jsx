@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const API_URL = 'http://127.0.0.1:8000';
+const API_URL = 'http://172.200.235.24:8000';
 
 function BannedUsers() {
   const [bannedUsers, setBannedUsers] = useState([]);

@@ -4,7 +4,7 @@ import { getReports, updateReport } from "../api/reports";
 import { getReports, updateReport, banVendorFromReport } from "../api/reports";
 
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8000";
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://172.200.235.24:8000";
 
 function AdminReports() {
   const [reports, setReports] = useState([]);

@@ -8,7 +8,7 @@ import {
 } from "../api/categories";
 
 // Asegura que la URL no termine en slash doble si la env concatenada lo tiene
-const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "http://172.200.235.24:8000").replace(/\/$/, "");
 
 function AdminCategories() {
   const [categories, setCategories] = useState([]);

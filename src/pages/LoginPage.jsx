@@ -1,10 +1,8 @@
 // En: src/pages/LoginPage.jsx
 
 import React, { useState } from 'react';
-import axios from 'axios';
+import client from '../api/client'; // <--- IMPORTANTE: Usamos nuestro cliente configurado
 import { useNavigate } from 'react-router-dom';
-
-const API_URL = 'http://127.0.0.1:8000';
 
 function LoginPage() {
   const [username, setUsername] = useState('');
@@ -13,45 +11,37 @@ function LoginPage() {
   
   const navigate = useNavigate();
 
-  // --- ¡FUNCIÓN handleLogin CORREGIDA! ---
   const handleLogin = (e) => {
     e.preventDefault();
     setError('');
 
-    // --- ¡AQUÍ ESTÁ EL CAMBIO! ---
-    // 1. Declaramos la variable del token aquí, en el scope superior
+    // Variable temporal para guardar el token
     let receivedToken = null; 
 
-    // --- Paso 1: Intentar Iniciar Sesión ---
-    axios.post(`${API_URL}/api/token/`, {
+    // 1. Usamos 'client.post' (Ya sabe que va a http://172.200.235.24:8000/api)
+    // Solo agregamos la parte final de la ruta: '/token/'
+    client.post('/token/', {
       username: username,
       password: password
     })
     .then(response => {
-      // 2. Asignamos el valor a la variable
-      receivedToken = response.data.access; 
+      receivedToken = "Bearer " + response.data.access; 
       
-      // --- Paso 2: Verificar si es un Admin ---
-      return axios.get(`${API_URL}/api/users/profile/`, {
-        headers: { 'Authorization': `Bearer ${receivedToken}` }
+      // 2. Pedimos el perfil. 
+      // NOTA: Pasamos el header manual aquí porque el interceptor lee de localStorage,
+      // y todavía no hemos guardado nada en localStorage.
+      return client.get('/users/profile/', {
+        headers: { 'Authorization': receivedToken }
       });
     })
     .then(profileResponse => {
       const profile = profileResponse.data;
 
-      // --- Paso 3: Validar el Rol ---
       if (profile.profile.role === 'admin') {
-        
-        // --- ¡AHORA SÍ FUNCIONA! ---
-        // 4. Guardamos el token (que SÍ existe en este scope)
-        localStorage.setItem('adminToken', `Bearer ${receivedToken}`);
-        
-        // Guardamos los datos del usuario para el header
+        // 3. ¡Éxito! Guardamos todo
+        localStorage.setItem('adminToken', receivedToken);
         localStorage.setItem('adminUser', JSON.stringify(profile)); 
-        
-        // Redireccionamos al panel de admin
         navigate('/admin/reports'); 
-        
       } else {
         setError('Acceso denegado. Esta cuenta no es de un administrador.');
       }
@@ -61,7 +51,6 @@ function LoginPage() {
       setError('Error en el inicio de sesión. Revisa tus credenciales.');
     });
   };
-  // --- FIN DE LA FUNCIÓN CORREGIDA ---
 
   return (
     <div className="login-container">
