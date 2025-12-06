@@ -1,122 +1,284 @@
 // En: src/pages/ManageReports.jsx
-// (Actualizado para mostrar detalles completos del producto)
+import { useEffect, useState } from "react";
+import { getReports, banUser, updateReportStatus } from "../api/reports"; // Usamos nuestra API limpia
 
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-
-const API_URL = 'http://127.0.0.1:8000';
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
 function ManageReports() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
 
-  // 1. Cargar reportes (sin cambios)
-  const fetchReports = () => {
+  // Estados para el Modal de Acciones
+  const [selectedReport, setSelectedReport] = useState(null); // Reporte seleccionado para ver detalle
+  const [actionLoading, setActionLoading] = useState(false);
+
+  // Carga inicial
+  const loadReports = () => {
     setLoading(true);
-    const token = localStorage.getItem('adminToken');
-    
-    axios.get(`${API_URL}/api/reports/`, {
-      headers: { 'Authorization': token }
-    })
-    .then(response => {
-      setReports(response.data); 
-      setLoading(false);
-    })
-    .catch(err => {
-      setError("No se pudieron cargar los reportes.");
-      setLoading(false);
-    });
+    getReports()
+      .then((data) => {
+        setReports(data);
+      })
+      .catch((err) => {
+        console.error("Error cargando reportes:", err);
+        setError("No se pudieron cargar los reportes. Revisa que el backend esté activo.");
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    fetchReports();
-  }, []); 
+    loadReports();
+  }, []);
 
-  // 2. Marcar como resuelto (sin cambios)
-  const handleResolveReport = (reportId) => {
-    if (!window.confirm(`¿Estás seguro de que quieres marcar este reporte como resuelto?`)) {
+  // --- LÓGICA DE ACCIONES ---
+
+  // 1. Banear Vendedor
+  const handleBan = async (report) => {
+    if (!report.product?.vendor?.id) {
+      alert("Error: No se encuentra la ID del vendedor.");
       return;
     }
-    const token = localStorage.getItem('adminToken');
-    axios.patch(`${API_URL}/api/reports/${reportId}/`, { status: "resolved" }, {
-      headers: { 'Authorization': token }
-    })
-    .then(() => fetchReports())
-    .catch(err => alert("Error al resolver el reporte."));
-  };
 
-  // 3. Borrar producto (sin cambios)
-  const handleDeleteProduct = (productId, productName) => {
-     if (!window.confirm(`ACCIÓN: ¿Estás seguro de que quieres BORRAR el producto '${productName}'?`)) {
-      return;
+    const reason = prompt("Escribe el motivo del BANEO (esto lo verá el usuario):");
+    if (!reason) return;
+
+    if (!window.confirm(`¿Confirmas banear a ${report.product.vendor.first_name}?`)) return;
+
+    setActionLoading(true);
+    try {
+      await banUser(report.product.vendor.id, reason);
+      alert("Usuario baneado correctamente.");
+      setSelectedReport(null); // Cerramos modal
+      loadReports(); // Recargamos la tabla
+    } catch (err) {
+      console.error(err);
+      alert("Error al banear al usuario.");
+    } finally {
+      setActionLoading(false);
     }
-     const token = localStorage.getItem('adminToken');
-     axios.delete(`${API_URL}/api/products/${productId}/`, {
-       headers: { 'Authorization': token }
-     })
-     .then(() => fetchReports()) // Recargamos la lista de reportes
-     .catch(err => alert("Error al borrar el producto."));
   };
 
+  // 2. Marcar como Atendido
+  const handleAttended = async (report) => {
+    const feedback = prompt("Escribe una respuesta para el usuario que reportó (Feedback):", "Gracias, hemos revisado tu reporte.");
+    if (!feedback) return;
+
+    setActionLoading(true);
+    try {
+      await updateReportStatus(report.id, "attended", feedback);
+      alert("Reporte marcado como atendido.");
+      setSelectedReport(null);
+      loadReports();
+    } catch (err) {
+      console.error(err);
+      alert("Error al actualizar el reporte.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // --- RENDERIZADO ---
+
+  if (loading) return <div style={{ padding: "2rem" }}>Cargando sistema de reportes...</div>;
+  if (error) return <div style={{ padding: "2rem", color: "red" }}>{error}</div>;
 
   return (
-    <div>
-      <h2>Gestionar Reportes de Productos</h2>
-      <p>Revisa los productos reportados por los usuarios y toma una acción.</p>
-      
-      {loading && <p>Cargando reportes...</p>}
-      {error && <p style={{color: 'red'}}>{error}</p>}
-      
-      <ul style={{ listStyle: 'none', padding: 0 }}>
-        {reports.map(report => (
-          <li key={report.id} style={{ border: '1px solid var(--border-color)', padding: '15px', marginBottom: '15px', borderRadius: '8px', backgroundColor: 'var(--white-panel)' }}>
-            
-            {/* --- ¡DETALLES DEL PRODUCTO AÑADIDOS! --- */}
-            {report.product ? (
-              <>
-                <h3>Producto: {report.product.name} (ID: {report.product.id})</h3>
-                <p><strong>Vendedor:</strong> {report.product.vendor?.first_name || 'N/A'}</p>
-                <p><strong>Precio:</strong> ${report.product.price} | <strong>Inventario:</strong> {report.product.inventory}</p>
-                <p><strong>Categoría:</strong> {report.product.category_name || 'N/A'}</p>
-                <p><strong>Descripción:</strong> {report.product.description}</p>
-              </>
-            ) : (
-              <h3>(Producto Eliminado)</h3>
-            )}
-            
-            <hr style={{ borderColor: 'var(--border-color)', opacity: 0.5, margin: '1rem 0' }} />
+    <div style={{ padding: "1rem" }}>
+      <h1>Gestión de Reportes</h1>
+      <p>Revisa las evidencias y toma acción sobre los usuarios reportados.</p>
 
-            {/* --- Detalles del Reporte --- */}
-            <p style={{fontWeight: 'bold', fontSize: '1.1rem'}}>Razón del Reporte (de {report.reporter?.first_name || 'N/A'}):</p>
-            <p style={{fontStyle: 'italic'}}>"{report.reason}"</p>
-            
-            {/* Botones de Acción */}
-            <button 
-              style={{ background: 'var(--success-green)', color: 'white', marginRight: '10px' }}
-              onClick={() => handleResolveReport(report.id)}
-            >
-              Marcar como Resuelto
-            </button>
-            
-            {/* Solo muestra el botón de borrar si el producto aún existe */}
-            {report.product && (
-              <button 
-                style={{ background: 'var(--danger-red)', color: 'white' }}
-                onClick={() => handleDeleteProduct(report.product.id, report.product.name)}
-              >
-                Borrar Producto
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
+      {/* TABLA PRINCIPAL */}
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "1rem", backgroundColor: "white" }}>
+          <thead>
+            <tr style={{ backgroundColor: "#f4f4f4", textAlign: "left" }}>
+              <th style={th}>ID</th>
+              <th style={th}>Motivo</th>
+              <th style={th}>Producto / Vendedor</th>
+              <th style={th}>Estado</th>
+              <th style={th}>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reports.map((report) => (
+              <tr key={report.id} style={{ borderBottom: "1px solid #eee" }}>
+                <td style={td}>#{report.id}</td>
+                <td style={td}>
+                    <strong>{report.reason}</strong>
+                    <br/>
+                    <small style={{color: '#666'}}>{new Date(report.created_at).toLocaleDateString()}</small>
+                </td>
+                
+                <td style={td}>
+                  {report.product ? (
+                    <div>
+                        <span style={{ fontWeight: "bold" }}>Prod: {report.product.name}</span>
+                        <br />
+                        <span>Vend: {report.product.vendor?.first_name || "Desconocido"}</span>
+                    </div>
+                  ) : (
+                    <span style={{ color: "red" }}>Producto eliminado</span>
+                  )}
+                </td>
 
-      {!loading && reports.length === 0 && (
-        <p>¡Buen trabajo! No hay reportes pendientes de revisión.</p>
+                <td style={td}>
+                  {report.status === "pending" && <span style={badge("orange")}>Pendiente</span>}
+                  {report.status === "attended" && <span style={badge("green")}>Atendido</span>}
+                  {report.status === "resolved" && <span style={badge("blue")}>Resuelto</span>}
+                </td>
+
+                <td style={td}>
+                  <button 
+                    onClick={() => setSelectedReport(report)}
+                    style={btnPrimary}
+                  >
+                    🔍 Ver Detalles y Accionar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {reports.length === 0 && <p style={{textAlign: "center", marginTop: "2rem"}}>No hay reportes pendientes.</p>}
+
+      {/* --- MODAL DE DETALLES --- */}
+      {selectedReport && (
+        <div style={modalOverlay}>
+          <div style={modalContent}>
+            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
+                <h2>Detalles del Reporte #{selectedReport.id}</h2>
+                <button onClick={() => setSelectedReport(null)} style={{cursor: 'pointer', background: 'none', border: 'none', fontSize: '1.5rem'}}>✖</button>
+            </div>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                
+                {/* COLUMNA IZQUIERDA: INFO */}
+                <div>
+                    <h3>Motivo:</h3>
+                    <p style={{backgroundColor: '#fff3cd', padding: '10px', borderRadius: '4px'}}>"{selectedReport.reason}"</p>
+                    
+                    <h3>Involucrados:</h3>
+                    <p><strong>Reportado por:</strong> {selectedReport.reporter?.first_name || "Anónimo"}</p>
+                    
+                    {selectedReport.product && (
+                        <div style={{border: '1px solid #ddd', padding: '10px', borderRadius: '4px', marginTop: '10px'}}>
+                            <strong>Producto Reportado:</strong> {selectedReport.product.name}
+                            <br/>
+                            <strong>Vendedor:</strong> {selectedReport.product.vendor?.first_name} ({selectedReport.product.vendor?.email})
+                            <br/>
+                            <small>ID Vendedor: {selectedReport.product.vendor?.id}</small>
+                        </div>
+                    )}
+                </div>
+
+                {/* COLUMNA DERECHA: EVIDENCIAS */}
+                <div>
+                    <h3>Evidencia Principal:</h3>
+                    {selectedReport.evidence ? (
+                        <a href={buildImageUrl(selectedReport.evidence)} target="_blank" rel="noreferrer">
+                            <img 
+                                src={buildImageUrl(selectedReport.evidence)} 
+                                alt="Evidencia" 
+                                style={{width: '100%', maxHeight: '200px', objectFit: 'contain', border: '1px solid #ccc'}}
+                            />
+                        </a>
+                    ) : (
+                        <p>No se adjuntó foto principal.</p>
+                    )}
+
+                    {/* Aquí podrías mapear más capturas si el backend las devuelve en un array */}
+                </div>
+            </div>
+
+            {/* BOTONERA DE ACCIONES */}
+            <div style={{ marginTop: "2rem", paddingTop: "1rem", borderTop: "1px solid #eee", display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
+                {actionLoading ? (
+                    <p>Procesando...</p>
+                ) : (
+                    <>
+                        <button 
+                            onClick={() => handleAttended(selectedReport)}
+                            style={{...btnAction, backgroundColor: '#28a745'}}
+                        >
+                            ✅ Marcar como Atendido
+                        </button>
+                        
+                        <button 
+                            onClick={() => handleBan(selectedReport)}
+                            style={{...btnAction, backgroundColor: '#dc3545'}}
+                        >
+                            🚫 Banear Vendedor
+                        </button>
+                    </>
+                )}
+            </div>
+
+          </div>
+        </div>
       )}
+
     </div>
   );
+}
+
+// --- ESTILOS SIMPLES (CSS-in-JS) ---
+const th = { padding: "12px", borderBottom: "2px solid #ddd" };
+const td = { padding: "10px", borderBottom: "1px solid #eee" };
+
+const badge = (color) => ({
+    backgroundColor: color,
+    color: "white",
+    padding: "4px 8px",
+    borderRadius: "12px",
+    fontSize: "0.8rem",
+    fontWeight: "bold"
+});
+
+const btnPrimary = {
+    padding: "6px 12px",
+    cursor: "pointer",
+    backgroundColor: "#007bff",
+    color: "white",
+    border: "none",
+    borderRadius: "4px"
+};
+
+const btnAction = {
+    padding: "10px 20px",
+    cursor: "pointer",
+    color: "white",
+    border: "none",
+    borderRadius: "4px",
+    fontWeight: "bold",
+    fontSize: "1rem"
+};
+
+// Estilos del Modal
+const modalOverlay = {
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    display: 'flex', justifyContent: 'center', alignItems: 'center',
+    zIndex: 1000
+};
+
+const modalContent = {
+    backgroundColor: 'white',
+    padding: '2rem',
+    borderRadius: '8px',
+    width: '90%',
+    maxWidth: '800px',
+    maxHeight: '90vh',
+    overflowY: 'auto',
+    boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+};
+
+function buildImageUrl(path) {
+  if (!path) return "";
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  return `${BACKEND_URL}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
 export default ManageReports;

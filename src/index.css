@@ -342,3 +342,109 @@ button[style*="background: grey"]:hover {
   font-weight: 600;
 }
 .manage-categories-form button[type="submit"]:hover { background-color: #0069d9; }
+
+.card {
+  background-color: var(--bg-white-panel);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05); /* Sombra suave */
+  border: 1px solid var(--border-color);
+  overflow: hidden; /* Para que el header no se salga de las esquinas */
+  margin-bottom: 2rem;
+}
+
+.card-header {
+  background-color: var(--bg-dark-sidebar); /* Azul oscuro elegante */
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.card-header h3 {
+  margin: 0;
+  color: var(--text-sidebar-light); /* Texto blanco */
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.card-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+/* --- Inputs y Textareas Mejorados --- */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-control {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+
+.form-control:focus {
+  border-color: var(--primary-blue);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+/* --- Previsualización de Imagen --- */
+.preview-container {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px dashed #cbd5e0;
+  border-radius: 6px;
+  width: fit-content;
+  text-align: center;
+}
+
+.preview-img {
+  height: 100px;
+  objectFit: contain;
+  border-radius: 4px;
+}
+
+/* --- Imágenes en Tablas --- */
+.table-img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.no-img-box {
+  width: 48px;
+  height: 48px;
+  background-color: var(--bg-light-content);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--text-light);
+}
+
+/* --- Botones de Acción (Iconos) --- */
+.btn-icon {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  margin-right: 5px;
+  transition: all 0.2s;
+}
+
+.btn-icon:hover {
+  background-color: var(--bg-light-content);
+  border-color: var(--text-light);
+}

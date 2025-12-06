@@ -1,148 +1,211 @@
 // En: src/pages/ManageCategories.jsx
-
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import client from '../api/client';
 
-const API_URL = 'http://127.0.0.1:8000';
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
 function ManageCategories() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
-  // Nuevo estado para el formulario de "Crear Categoría"
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [newCategoryDesc, setNewCategoryDesc] = useState('');
 
-  // 1. Función para cargar las categorías
+  // Estados del formulario
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
+
   const fetchCategories = () => {
     setLoading(true);
-    // GET /api/categories/ es público, no necesita token
-    axios.get(`${API_URL}/api/categories/`)
+    client.get('/categories/')
       .then(response => {
         setCategories(response.data);
         setLoading(false);
       })
       .catch(err => {
-        console.error("Error al cargar categorías:", err);
+        console.error("Error:", err);
         setError("No se pudieron cargar las categorías.");
         setLoading(false);
       });
   };
 
-  // 2. Cargar las categorías al montar la página
   useEffect(() => {
     fetchCategories();
-  }, []); // El '[]' vacío significa "corre esto solo una vez"
+  }, []);
 
-  // 3. Función para CREAR una nueva categoría
-  const handleCreate = (e) => {
-    e.preventDefault(); // Evita que el formulario recargue
-    const token = localStorage.getItem('adminToken'); // Token de Admin
-
-    axios.post(`${API_URL}/api/categories/`, 
-      {
-        name: newCategoryName,
-        description: newCategoryDesc
-      },
-      {
-        headers: { 'Authorization': token }
-      }
-    )
-    .then(response => {
-      // Si funciona, limpiamos el formulario y recargamos la lista
-      setNewCategoryName('');
-      setNewCategoryDesc('');
-      fetchCategories(); // Volvemos a cargar la lista para ver la nueva
-    })
-    .catch(err => {
-      console.error("Error al crear categoría:", err);
-      alert("Error al crear la categoría.");
-    });
+  const handleImageChange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    setImageFile(file || null);
+    if (file) {
+      setPreviewImage(URL.createObjectURL(file));
+    } else {
+      setPreviewImage(null);
+    }
   };
 
-  // 4. Función para BORRAR una categoría
-  const handleDelete = (categoryId) => {
-    // Pedimos confirmación
-    if (!window.confirm("¿Estás seguro de que quieres borrar esta categoría?")) {
-      return;
-    }
+  const handleEditClick = (category) => {
+    setEditingCategory(category);
+    setName(category.name);
+    setDescription(category.description);
+    setImageFile(null);
+    setPreviewImage(category.image ? buildImageUrl(category.image) : null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
-    const token = localStorage.getItem('adminToken'); // Token de Admin
+  const resetForm = () => {
+    setEditingCategory(null);
+    setName('');
+    setDescription('');
+    setImageFile(null);
+    setPreviewImage(null);
+  };
 
-    axios.delete(`${API_URL}/api/categories/${categoryId}/`, {
-      headers: { 'Authorization': token }
-    })
-    .then(response => {
-      // Si funciona, recargamos la lista
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("description", description);
+    if (imageFile) formData.append("image", imageFile);
+
+    try {
+      if (editingCategory) {
+        await client.patch(`/categories/${editingCategory.id}/`, formData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+        alert("Categoría actualizada.");
+      } else {
+        await client.post('/categories/', formData, {
+          headers: { "Content-Type": "multipart/form-data" }
+        });
+        alert("Categoría creada.");
+      }
+      resetForm();
       fetchCategories();
-    })
-    .catch(err => {
-      console.error("Error al borrar categoría:", err);
-      alert("Error al borrar la categoría.");
-    });
+    } catch (err) {
+      alert("Error al guardar. Revisa los datos.");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("¿Borrar categoría?")) return;
+    try {
+      await client.delete(`/categories/${id}/`);
+      fetchCategories();
+    } catch (err) {
+      alert("Error al borrar.");
+    }
   };
 
   return (
-    <div>
+    <div style={{ padding: "1rem" }}> {/* Container simple */}
       <h2>Gestionar Categorías</h2>
-      
-      {/* --- Formulario de Creación (con nueva clase) --- */}
-      <form onSubmit={handleCreate} className="manage-categories-form">
-        <h3>Crear Nueva Categoría</h3>
-        <div>
-          <label>Nombre:</label>
-          <input 
-            type="text" 
-            value={newCategoryName}
-            onChange={(e) => setNewCategoryName(e.target.value)}
-            required 
-          />
-        </div>
-        <div>
-          <label>Descripción:</label>
-          <input 
-            type="text" 
-            value={newCategoryDesc}
-            onChange={(e) => setNewCategoryDesc(e.target.value)}
-          />
-        </div>
-        <button type="submit">Crear</button>
-      </form>
+      <p style={{marginBottom: '2rem', color: 'var(--text-light)'}}>Administra las categorías de tus productos.</p>
 
-      {/* --- Lista de Categorías Existentes --- */}
-      <h3>Categorías Existentes</h3>
-      {loading && <p>Cargando categorías...</p>}
-      {error && <p style={{color: 'red'}}>{error}</p>}
-      
-      <table> {/* Las tablas ya tienen estilo global */}
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Nombre</th>
-            <th>Descripción</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {categories.map(category => (
-            <tr key={category.id}>
-              <td>{category.id}</td>
-              <td>{category.name}</td>
-              <td>{category.description}</td>
-              <td>
-                <button 
-                  onClick={() => handleDelete(category.id)}
-                >
-                  Borrar
+      {/* --- TARJETA FORMULARIO --- */}
+      <div className="card">
+        <div className="card-header">
+          <h3>{editingCategory ? `✏️ Editando: ${editingCategory.name}` : "➕ Nueva Categoría"}</h3>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="card-body">
+          <div className="form-group">
+            <label>Nombre</label>
+            <input 
+                type="text" 
+                className="form-control"
+                placeholder="Ej. Electrónica" 
+                value={name} 
+                onChange={e => setName(e.target.value)} 
+                required 
+            />
+          </div>
+          
+          <div className="form-group">
+            <label>Descripción</label>
+            <textarea 
+                className="form-control"
+                placeholder="Breve descripción..." 
+                value={description} 
+                onChange={e => setDescription(e.target.value)} 
+                rows="3"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Imagen</label>
+            <input 
+                type="file" 
+                accept="image/*" 
+                onChange={handleImageChange}
+            />
+            {previewImage && (
+                <div className="preview-container">
+                    <img src={previewImage} alt="Preview" className="preview-img" />
+                    <div style={{fontSize: '0.8rem', color: '#666'}}>Vista previa</div>
+                </div>
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+            <button type="submit" style={{ backgroundColor: "var(--primary-blue)", color: "white" }}>
+                {editingCategory ? "Guardar Cambios" : "Crear Categoría"}
+            </button>
+            
+            {editingCategory && (
+                <button type="button" onClick={resetForm} style={{ backgroundColor: "var(--info-gray)", color: "white" }}>
+                    Cancelar
                 </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            )}
+          </div>
+        </form>
+      </div>
+
+      {/* --- TABLA --- */}
+      {loading && <p>Cargando...</p>}
+      
+      {!loading && (
+        <div className="card"> {/* Reusamos el estilo card para la tabla */}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Imagen</th>
+                        <th>Nombre</th>
+                        <th>Descripción</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {categories.map((cat) => (
+                        <tr key={cat.id}>
+                            <td>
+                                {cat.image ? (
+                                    <img src={buildImageUrl(cat.image)} alt={cat.name} className="table-img" />
+                                ) : (
+                                    <div className="no-img-box">Sin foto</div>
+                                )}
+                            </td>
+                            <td><strong>{cat.name}</strong></td>
+                            <td>{cat.description}</td>
+                            <td>
+                                <button onClick={() => handleEditClick(cat)} className="btn-icon" title="Editar">✏️</button>
+                                <button onClick={() => handleDelete(cat.id)} className="btn-icon" style={{color: 'var(--danger-red)', borderColor: 'var(--danger-red)'}} title="Eliminar">🗑️</button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+            {categories.length === 0 && <p style={{padding: '20px', textAlign: 'center'}}>No hay categorías.</p>}
+        </div>
+      )}
     </div>
   );
+}
+
+function buildImageUrl(path) {
+  if (!path) return "";
+  if (path.startsWith("http")) return path;
+  return `${BACKEND_URL}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
 export default ManageCategories;

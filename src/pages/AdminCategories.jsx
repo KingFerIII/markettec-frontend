@@ -7,19 +7,20 @@ import {
   deleteCategory,
 } from "../api/categories";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8000";
+// Asegura que la URL no termine en slash doble si la env concatenada lo tiene
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
 function AdminCategories() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // estado del formulario
-  const [editingCategory, setEditingCategory] = useState(null); // null = creando
+  // Estados del formulario
+  const [editingCategory, setEditingCategory] = useState(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [imageFile, setImageFile] = useState(null);
-  const [previewImage, setPreviewImage] = useState(null);
+  const [imageFile, setImageFile] = useState(null); // El archivo nuevo seleccionado
+  const [previewImage, setPreviewImage] = useState(null); // URL para mostrar
 
   const loadCategories = () => {
     setLoading(true);
@@ -46,6 +47,7 @@ function AdminCategories() {
     setPreviewImage(null);
   };
 
+  // --- AQUÍ ESTÁ EL CAMBIO CLAVE ---
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -54,22 +56,25 @@ function AdminCategories() {
       return;
     }
 
+    // Usamos FormData para empaquetar texto + archivo
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("description", description);
+
+    // Solo agregamos la imagen si el usuario seleccionó una nueva.
+    if (imageFile) {
+      // OJO: "image" debe coincidir con el nombre del campo en tu modelo Django
+      formData.append("image", imageFile);
+    }
+
     try {
       if (editingCategory) {
         // EDITAR
-        await updateCategory(editingCategory.id, {
-          name,
-          description,
-          imageFile,
-        });
+        await updateCategory(editingCategory.id, formData);
         alert("Categoría actualizada correctamente.");
       } else {
         // CREAR
-        await createCategory({
-          name,
-          description,
-          imageFile,
-        });
+        await createCategory(formData);
         alert("Categoría creada correctamente.");
       }
 
@@ -80,15 +85,15 @@ function AdminCategories() {
       alert("Error al guardar la categoría. Revisa la consola.");
     }
   };
+  // ---------------------------------
 
   const handleEditClick = (category) => {
     setEditingCategory(category);
     setName(category.name || "");
     setDescription(category.description || "");
-    setImageFile(null);
-    setPreviewImage(
-      category.image ? buildImageUrl(category.image) : null
-    );
+    setImageFile(null); // Reseteamos el archivo nuevo
+    // Mostramos la imagen actual que viene del backend
+    setPreviewImage(category.image ? buildImageUrl(category.image) : null);
   };
 
   const handleDeleteClick = async (category) => {
@@ -102,7 +107,6 @@ function AdminCategories() {
       alert("Categoría eliminada.");
       loadCategories();
 
-      // si estabas editando esta categoría, limpia el formulario
       if (editingCategory && editingCategory.id === category.id) {
         resetForm();
       }
@@ -113,7 +117,6 @@ function AdminCategories() {
   };
 
   const handleImageChange = (e) => {
-    // Versión compatible sin optional chaining
     const file = e.target.files && e.target.files[0];
     setImageFile(file || null);
 
@@ -130,100 +133,83 @@ function AdminCategories() {
 
   return (
     <div style={{ padding: "1rem" }}>
-      <h1>Categorías</h1>
+      <h1>Gestión de Categorías</h1>
 
-      {/* FORMULARIO CREA / EDITA */}
-      <section
-        style={{
-          marginBottom: "2rem",
-          padding: "1rem",
-          border: "1px solid #ccc",
-          borderRadius: "4px",
-        }}
-      >
+      {/* FORMULARIO */}
+      <section style={{ marginBottom: "2rem", padding: "1rem", border: "1px solid #ccc", borderRadius: "8px", backgroundColor: "#f9f9f9" }}>
         <h2>{editingCategory ? "Editar categoría" : "Crear nueva categoría"}</h2>
 
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: "0.5rem" }}>
-            <label>
-              Nombre:
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                style={{ marginLeft: "0.5rem", width: "250px" }}
-              />
-            </label>
-          </div>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '500px' }}>
+          
+          <label>
+            <strong>Nombre:</strong>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              style={{ display: 'block', width: '100%', padding: '8px', marginTop: '5px' }}
+            />
+          </label>
 
-          <div style={{ marginBottom: "0.5rem" }}>
-            <label>
-              Descripción:
-              <br />
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                style={{ width: "100%", maxWidth: "400px" }}
-              />
-            </label>
-          </div>
+          <label>
+            <strong>Descripción:</strong>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              style={{ display: 'block', width: '100%', padding: '8px', marginTop: '5px' }}
+            />
+          </label>
 
-          <div style={{ marginBottom: "0.5rem" }}>
-            <label>
-              Imagen:
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                style={{ marginLeft: "0.5rem" }}
-              />
-            </label>
-          </div>
+          <label>
+            <strong>Imagen:</strong>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              style={{ display: 'block', marginTop: '5px' }}
+            />
+          </label>
 
+          {/* Previsualización */}
           {previewImage && (
-            <div style={{ marginBottom: "0.5rem" }}>
-              <p>Vista previa:</p>
+            <div style={{ border: '1px dashed #ccc', padding: '10px', textAlign: 'center' }}>
+              <p style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: '#666' }}>Vista previa:</p>
               <img
                 src={previewImage}
                 alt="Vista previa"
-                style={{ width: 100, height: 100, objectFit: "cover" }}
+                style={{ maxWidth: "100%", maxHeight: "200px", objectFit: "contain" }}
               />
             </div>
           )}
 
-          <button type="submit">
-            {editingCategory ? "Guardar cambios" : "Crear categoría"}
-          </button>
-
-          {editingCategory && (
-            <button
-              type="button"
-              onClick={resetForm}
-              style={{ marginLeft: "0.5rem" }}
-            >
-              Cancelar edición
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button type="submit" style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px' }}>
+              {editingCategory ? "Guardar cambios" : "Crear categoría"}
             </button>
-          )}
+
+            {editingCategory && (
+              <button
+                type="button"
+                onClick={resetForm}
+                style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px' }}
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
         </form>
       </section>
 
-      {/* LISTA DE CATEGORÍAS */}
+      {/* LISTA */}
       <section>
-        <h2>Categorías existentes</h2>
-
+        <h2>Lista de Categorías</h2>
         {categories.length === 0 && <p>No hay categorías registradas.</p>}
 
         {categories.length > 0 && (
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              marginTop: "1rem",
-            }}
-          >
+          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "1rem" }}>
             <thead>
-              <tr>
+              <tr style={{ backgroundColor: "#eee" }}>
                 <th style={th}>Imagen</th>
                 <th style={th}>Nombre</th>
                 <th style={th}>Descripción</th>
@@ -238,23 +224,20 @@ function AdminCategories() {
                       <img
                         src={buildImageUrl(category.image)}
                         alt={category.name}
-                        style={{ width: 80, height: 80, objectFit: "cover" }}
+                        style={{ width: 80, height: 80, objectFit: "cover", borderRadius: "4px" }}
                       />
                     ) : (
-                      "Sin imagen"
+                      <span style={{ color: '#999', fontStyle: 'italic' }}>Sin imagen</span>
                     )}
                   </td>
-                  <td style={td}>{category.name}</td>
+                  <td style={td}><strong>{category.name}</strong></td>
                   <td style={td}>{category.description}</td>
                   <td style={td}>
-                    <button onClick={() => handleEditClick(category)}>
-                      Editar
+                    <button onClick={() => handleEditClick(category)} style={{ marginRight: "5px", cursor: 'pointer' }}>
+                      ✏️ Editar
                     </button>
-                    <button
-                      onClick={() => handleDeleteClick(category)}
-                      style={{ marginLeft: "0.5rem" }}
-                    >
-                      Eliminar
+                    <button onClick={() => handleDeleteClick(category)} style={{ color: "red", cursor: 'pointer' }}>
+                      🗑️ Eliminar
                     </button>
                   </td>
                 </tr>
@@ -267,13 +250,13 @@ function AdminCategories() {
   );
 }
 
-const th = { border: "1px solid #ccc", padding: "0.5rem" };
-const td = { border: "1px solid #ccc", padding: "0.5rem", verticalAlign: "top" };
+const th = { border: "1px solid #ddd", padding: "10px", textAlign: "left" };
+const td = { border: "1px solid #ddd", padding: "10px", verticalAlign: "middle" };
 
 function buildImageUrl(path) {
   if (!path) return "";
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
-  return `${BACKEND_URL}${path}`;
+  return `${BACKEND_URL}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
 export default AdminCategories;

@@ -1,47 +1,39 @@
-// src/api/categories.js
 import api from "./client";
 
-// 1. Obtener lista de categorías
-export async function listCategories() {
+// 1. Obtener todas las categorías
+export const getCategories = async () => {
   const response = await api.get("/categories/");
-  return response.data; // [ { id, name, description, image }, ... ]
-}
+  return response.data;
+};
 
-// 2. Crear categoría (nombre + descripción + imagen)
-export async function createCategory({ name, description, imageFile }) {
-  const formData = new FormData();
-  formData.append("name", name);
-  formData.append("description", description || "");
-
-  if (imageFile) {
-    // El backend espera "image" como string, pero casi siempre
-    // DRF acepta archivo aquí si es ImageField. Lo mandamos como file.
-    formData.append("image", imageFile);
-  }
-
-  const response = await api.post("/categories/", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
+// 2. Crear una categoría (Soporta Imagen)
+// Recibe un objeto 'categoryData' que puede ser JSON o FormData
+// Si tu backend espera 'multipart/form-data', lo ideal es mandar FormData desde la vista.
+export const createCategory = async (categoryData) => {
+  const response = await api.post("/categories/", categoryData, {
+    headers: {
+      // Si mandamos FormData, axios suele ajustar el Content-Type automáticamente,
+      // pero es bueno asegurarse que el backend lo reciba como multipart si lleva foto.
+      "Content-Type": "multipart/form-data",
+    },
   });
   return response.data;
-}
+};
 
-// 3. Actualizar categoría existente
-export async function updateCategory(id, { name, description, imageFile }) {
-  const formData = new FormData();
-  formData.append("name", name);
-  formData.append("description", description || "");
-
-  if (imageFile) {
-    formData.append("image", imageFile);
-  }
-
-  const response = await api.put(`/categories/${id}/`, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
+// 3. Editar categoría (Soporta Imagen y cambio de Nombre)
+export const updateCategory = async (id, categoryData) => {
+  // Usamos .patch para actualizar parcialmente (ej. solo el nombre o solo la foto)
+  // o .put si el backend requiere enviar todo el objeto. Usualmente PATCH es más seguro para archivos.
+  const response = await api.patch(`/categories/${id}/`, categoryData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
   });
   return response.data;
-}
+};
 
 // 4. Eliminar categoría
-export async function deleteCategory(id) {
-  return api.delete(`/categories/${id}/`);
-}
+export const deleteCategory = async (id) => {
+  const response = await api.delete(`/categories/${id}/`);
+  return response.data;
+};
