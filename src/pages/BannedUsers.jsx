@@ -1,96 +1,87 @@
-// En: src/pages/BannedUsers.jsx
-
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-
-const API_URL = 'http://172.200.235.24/api';
+import client from '../api/client'; // <--- Usamos el cliente configurado
 
 function BannedUsers() {
   const [bannedUsers, setBannedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // 1. Función para cargar (o recargar) los usuarios baneados
+  // 1. Cargar usuarios baneados
   const fetchBannedUsers = () => {
     setLoading(true);
-    const token = localStorage.getItem('adminToken');
     
-    // Llamamos al nuevo endpoint de la API
-    axios.get(`${API_URL}/api/users/banned_users/`, {
-      headers: { 'Authorization': token }
-    })
-    .then(response => {
-      // Este endpoint (como /api/users/) devuelve una lista simple
-      setBannedUsers(response.data); 
-      setLoading(false);
-    })
-    .catch(err => {
-      console.error("Error al cargar usuarios baneados:", err);
-      setError("No se pudieron cargar los usuarios baneados.");
-      setLoading(false);
-    });
+    // Usamos client.get. El token se pone solo.
+    // La ruta es relativa a /api, así que solo ponemos la parte final.
+    client.get('/users/banned_users/')
+      .then(response => {
+        setBannedUsers(response.data); 
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error al cargar usuarios baneados:", err);
+        setError("No se pudieron cargar los usuarios baneados.");
+        setLoading(false);
+      });
   };
 
-  // 2. Cargar los usuarios al montar la página
   useEffect(() => {
     fetchBannedUsers();
-  }, []); // El '[]' vacío significa "corre esto solo una vez"
+  }, []);
 
-  // 3. Función para DESBANEAR (la misma de ManageUsers)
+  // 2. Desbanear
   const handleUnbanUser = (userId, username) => {
-    const token = localStorage.getItem('adminToken');
-    
-    axios.post(`${API_URL}/api/users/${userId}/unban_user/`, {}, {
-      headers: { 'Authorization': token }
-    })
-    .then(() => {
-      // Si funciona, recargamos la lista de baneados (el usuario desaparecerá de aquí)
-      fetchBannedUsers(); 
-    })
-    .catch(err => alert("Error al desbanear al usuario."));
+    if(!window.confirm(`¿Desbanear a ${username}?`)) return;
+
+    client.post(`/users/${userId}/unban_user/`, {})
+      .then(() => {
+        alert("Usuario desbaneado.");
+        fetchBannedUsers(); // Recargar lista
+      })
+      .catch(err => alert("Error al desbanear al usuario."));
   };
 
   return (
-    <div>
+    <div style={{ padding: "1rem" }}>
       <h2>Usuarios Baneados</h2>
       <p>Esta es la lista de todos los usuarios que actualmente tienen el acceso bloqueado.</p>
       
       {loading && <p>Cargando usuarios...</p>}
       {error && <p style={{color: 'red'}}>{error}</p>}
       
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Usuario</th>
-            <th>Correo</th>
-            <th>Rol</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        
-        <tbody>
-          {bannedUsers.map(user => (
-            <tr key={user.id}>
-              <td>{user.id}</td>
-              <td>{user.username}</td>
-              <td>{user.email}</td>
-              <td>{user.profile?.role || 'N/A'}</td>
-              <td>
-                <button 
-                  style={{ background: '#5bc0de', color: 'white' }}
-                  onClick={() => handleUnbanUser(user.id, user.username)}
-                >
-                  Desbanear
-                </button>
-              </td>
+      {!loading && !error && (
+        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "1rem" }}>
+          <thead>
+            <tr style={{background: '#eee', textAlign: 'left'}}>
+              <th style={{padding: '10px'}}>ID</th>
+              <th style={{padding: '10px'}}>Usuario</th>
+              <th style={{padding: '10px'}}>Correo</th>
+              <th style={{padding: '10px'}}>Rol</th>
+              <th style={{padding: '10px'}}>Acciones</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {bannedUsers.map(user => (
+              <tr key={user.id} style={{borderBottom: '1px solid #ddd'}}>
+                <td style={{padding: '10px'}}>{user.id}</td>
+                <td style={{padding: '10px'}}>{user.username}</td>
+                <td style={{padding: '10px'}}>{user.email}</td>
+                <td style={{padding: '10px'}}>{user.profile?.role || 'N/A'}</td>
+                <td style={{padding: '10px'}}>
+                  <button 
+                    style={{ background: '#5bc0de', color: 'white', padding: '5px 10px', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                    onClick={() => handleUnbanUser(user.id, user.username)}
+                  >
+                    Desbanear
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       {!loading && bannedUsers.length === 0 && (
-        <p>No hay usuarios baneados actualmente.</p>
+        <p style={{marginTop: '20px', fontStyle: 'italic'}}>No hay usuarios baneados actualmente.</p>
       )}
     </div>
   );
